@@ -1,0 +1,7 @@
+pandas
+numpy
+faiss-cpu
+sentence-transformers
+scikit-learn
+nltk
+ipykernel
