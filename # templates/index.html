@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Limeat - Analyse Nutritionnelle</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Limeat - Analyse Nutritionnelle</h1>
+        
+        <!-- Section uplaod -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Analyser un repas</h2>
+            <form id="uploadForm" class="space-y-4">
+                <div class="border-dashed border-2 border-gray-300 rounded-lg p-6 text-center">
+                    <input type="file" id="mealImage" accept="image/*" class="hidden">
+                    <label for="mealImage" class="cursor-pointer text-blue-500">
+                        Choisir une image
+                    </label>
+                    <div id="preview" class="mt-4"></div>
+                </div>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">
+                    Analyser
+                </button>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden">
+            <!-- Loading -->
+            <div id="loading" class="text-center py-8 hidden">
+                <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                <p class="mt-4">Analyse en cours...</p>
+            </div>
+
+            <!-- Analysis Results -->
+            <div id="analysisResults" class="space-y-8">
+                <!-- Nutritional Scores -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">Scores Nutritionnels</h2>
+                    <div class="grid grid-cols-3 gap-4" id="scores"></div>
+                </div>
+
+                <!-- Nutritional Values -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">Valeurs Nutritionnelles</h2>
+                    <div id="nutrients"></div>
+                </div>
+
+                <!-- Analysis -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">Analyse</h2>
+                    <div id="analysis"></div>
+                </div>
+
+                <!-- Suggestions -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">Suggestions</h2>
+                    <div id="suggestions"></div>
+                </div>
+
+                <!-- Evening Meal -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">Suggestions pour le Soir</h2>
+                    <div id="eveningMeal"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const file = document.getElementById('mealImage').files[0];
+            if (!file) return;
+
+            // Show loading
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('analysisResults').classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                displayResults(result);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Une erreur est survenue');
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        });
+
+        function displayResults(data) {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('analysisResults').classList.remove('hidden');
+
+            // Display scores
+            displayScores(data.scores);
+
+            // Display nutrients
+            displayNutrients(data.valeurs_nutritionnelles);
+
+            // Display analysis
+            displayAnalysis(data.analyse);
+
+            // Display suggestions
+            displaySuggestions(data.suggestions);
+
+            // Display evening meal suggestions
+            displayEveningMeal(data.repas_soir);
+        }
+
+        // Helper functions for displaying each section
+        function displayScores(scores) {
+            const scoresDiv = document.getElementById('scores');
+            scoresDiv.innerHTML = Object.entries(scores)
+                .map(([key, value]) => `
+                    <div class="text-center">
+                        <div class="text-2xl font-bold">${(value * 100).toFixed(0)}%</div>
+                        <div class="text-gray-500">${key.charAt(0).toUpperCase() + key.slice(1)}</div>
+                    </div>
+                `).join('');
+        }
+
+        function displayNutrients(nutrients) {
+            const nutrientsDiv = document.getElementById('nutrients');
+            nutrientsDiv.innerHTML = Object.entries(nutrients)
+                .map(([key, value]) => `
+                    <div class="mb-4">
+                        <h3 class="font-semibold">${key.charAt(0).toUpperCase() + key.slice(1)}</h3>
+                        <p>${value.valeur}g</p>
+                        <ul class="list-disc ml-4">
+                            ${value.sources.map(source => `<li>${source}</li>`).join('')}
+                        </ul>
+                    </div>
+                `).join('');
+        }
+
+        function displayAnalysis(analyse) {
+    const analysisDiv = document.getElementById('analysis');
+    analysisDiv.innerHTML = `
+        <div class="mb-4">
+            <h3 class="font-semibold">Points forts</h3>
+            <ul class="list-disc ml-4">
+                ${analyse.points_forts.map(point => `<li class="text-green-500">${point}</li>`).join('')}
+            </ul>
+        </div>
+        <div class="mb-4">
+            <h3 class="font-semibold">Points à améliorer</h3>
+            <ul class="list-disc ml-4">
+                ${analyse.points_faibles.map(point => `<li class="text-red-500">${point}</li>`).join('')}
+            </ul>
+        </div>
+        <div>
+            <h3 class="font-semibold">Description</h3>
+            <p>${analyse.description}</p>
+        </div>
+    `;
+}
+
+function displaySuggestions(suggestions) {
+    const suggestionsDiv = document.getElementById('suggestions');
+    let html = '';
+    
+    if (suggestions.ajouts) {
+        html += `
+            <div class="mb-4">
+                <h3 class="font-semibold">Ajouts recommandés</h3>
+                ${suggestions.ajouts.map(ajout => `
+                    <div class="p-2 bg-green-50 rounded mt-2">
+                        <p class="font-medium">${ajout.ingredient} (${ajout.quantite})</p>
+                        <p class="text-sm text-gray-600">${ajout.raison}</p>
+                        <ul class="list-disc ml-4 text-sm">
+                            ${ajout.apports.map(apport => `<li>${apport}</li>`).join('')}
+                        </ul>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    if (suggestions.remplacements) {
+        html += `
+            <div>
+                <h3 class="font-semibold">Remplacements suggérés</h3>
+                ${suggestions.remplacements.map(remp => `
+                    <div class="p-2 bg-blue-50 rounded mt-2">
+                        <p class="font-medium">Remplacer ${remp.remplacer} par ${remp.par}</p>
+                        <p class="text-sm text-gray-600">${remp.raison}</p>
+                        <ul class="list-disc ml-4 text-sm">
+                            ${remp.benefices.map(benefice => `<li>${benefice}</li>`).join('')}
+                        </ul>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    suggestionsDiv.innerHTML = html;
+}
+
+function displayEveningMeal(repas_soir) {
+    const eveningMealDiv = document.getElementById('eveningMeal');
+    eveningMealDiv.innerHTML = repas_soir.map(repas => `
+        <div class="p-4 bg-purple-50 rounded mb-4">
+            <h3 class="font-semibold">${repas.nom}</h3>
+            <p class="text-sm text-gray-600 mb-2">${repas.description}</p>
+            <div class="bg-white p-2 rounded">
+                <h4 class="font-medium mb-1">Complémentarité</h4>
+                <ul class="list-disc ml-4 text-sm">
+                    ${repas.complementarite.nutritionnelle.map(comp => `<li>${comp}</li>`).join('')}
+                </ul>
+                <p class="text-sm mt-2"><strong>Équilibre :</strong> ${repas.complementarite.equilibre_global}</p>
+                <p class="text-sm mt-1"><strong>Goût :</strong> ${repas.complementarite.gout}</p>
+            </div>
+        </div>
+    `).join('');
+}
+    </script>
+</body>
+</html>
