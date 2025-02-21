@@ -13,6 +13,9 @@ import anthropic
 from PIL import Image
 import plotly.graph_objects as go
 import uuid
+import numpy as np
+from typing import List, Dict, Tuple
+
 
 # Configuration
 load_dotenv()
@@ -161,6 +164,84 @@ class MealAnalyzer:
         except Exception as e:
             st.error(f"❌ Erreur d'initialisation : {str(e)}")
             raise e
+    import numpy as np
+from typing import List, Dict, Tuple
+
+class Ingredient:
+    def __init__(self, id: int, gQuantity: float, groupId: int = None):
+        self.id = id
+        self.gQuantity = gQuantity
+        self.groupId = groupId
+
+class NutritionalScorer:
+    def __init__(self, ingredients_db: pd.DataFrame, user_profile: Dict):
+        """Initialise le calculateur nutritionnel avec la base d'ingrédients et le profil utilisateur"""
+        self.ingredients_db = ingredients_db
+        self.user_profile = user_profile
+
+        self.nut_dict = {
+            '203': "Protéines", '204': "Lipides", '205': "Glucides", 
+            '208': "Energie", '291': "Fibres", '601': "Cholesterol", 
+            '255': "Eau", '269': "Sucres", '810': "Amidon"
+        }
+
+    def analyze_meal_nutritional_score(self, ingredients: List[Dict]) -> Dict:
+        """Analyse le score nutritionnel du repas"""
+        meal_ingredients = [Ingredient(id=ing['id'], gQuantity=ing.get('quantite', 100)) for ing in ingredients]
+        nutrients = self.get_nutrients_from_meal(meal_ingredients)
+        meal_nut_score, meal_energy_sub_score, meal_macro_sub_score = self._compute_meal_score(meal_ingredients, nutrients)
+
+        return {
+            'nutritional_score': meal_nut_score,
+            'energy_subscore': meal_energy_sub_score,
+            'macro_subscore': meal_macro_sub_score,
+            'nutrient_details': {self.nut_dict.get(k, k): v for k, v in nutrients.items()}
+        }
+
+    def _compute_meal_score(self, current_meal: List[Ingredient], summed_nutrients_info: Dict) -> Tuple[float, float, float]:
+        """Calcule le score nutritionnel global d'un repas"""
+        for ingredient in current_meal:
+            ingredient.groupId = self.ingredients_db.loc[self.ingredients_db['FoodID'] == ingredient.id, 'FoodGroupID'].values[0]
+
+        meal_energy_sub_score = self.compute_daily_energy_sub_score(summed_nutrients_info)
+        meal_macro_sub_score = self.compute_daily_macro_sub_score(current_meal, summed_nutrients_info)
+
+        meal_nut_sum = (1/3) * meal_energy_sub_score + (2/3) * meal_macro_sub_score
+        meal_nut_score = self.sigmoid_piecewise(meal_nut_sum, k1=5, k2=7.5, x0=0.5)
+
+        return meal_nut_score, meal_energy_sub_score, meal_macro_sub_score
+
+class ExtendedMealAnalyzer(MealAnalyzer):
+    def __init__(self):
+        super().__init__()
+
+        default_user_profile = {
+            "age": 35,
+            "weight": 70,
+            "size": 170,
+            "activityLevel": 1.4
+        }
+
+        self.nutritional_scorer = NutritionalScorer(self.ingredients_db, default_user_profile)
+
+    def analyze_meal_image(self, image_data):
+        """Ajoute une analyse nutritionnelle avancée et recommandations de repas"""
+        result = super().analyze_meal_image(image_data)
+        if result and 'ingredients' in result:
+            nutritional_analysis = self.nutritional_scorer.analyze_meal_nutritional_score([
+                {
+                    'id': self.ingredients_db[self.ingredients_db['FoodName'].str.lower() == ing['nom'].lower()]['FoodID'].values[0],
+                    'quantite': ing['quantite']
+                } for ing in result['ingredients']
+            ])
+            result['nutritional_score'] = {
+                'total_score': nutritional_analysis['nutritional_score'],
+                'energy_subscore': nutritional_analysis['energy_subscore'],
+                'macro_subscore': nutritional_analysis['macro_subscore']
+            }
+
+        return result
+    
 
     def analyze_meal_image(self, image_data):
         """Analyse une image de repas"""
@@ -431,7 +512,7 @@ def main():
         
         with col2:
             if uploaded_file and st.button("🔍 Analyser le repas"):
-                analyzer = MealAnalyzer()
+                analyzer = ExtendedMealAnalyzer()
                 result = analyzer.analyze_meal_image(uploaded_file.getvalue())
                 if result:
                     st.session_state.analysis_result = result
