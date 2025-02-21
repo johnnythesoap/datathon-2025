@@ -1,30 +1,31 @@
-# le fichier du user interface
-import tkinter as tk
-from main import get_ai_suggestions  # Import AI function from main.py
+from PyQt5 import QtCore, QtGui, QtWidgets
+import sys
+from main import get_ai_suggestions  # Importing the get_ai_suggestions from main.py
 
-# Function to adjust the Text widget size dynamically
+# Function to adjust the size of the Text widget dynamically
 def adjust_text_widget_size():
     """Dynamically adjust the height of the text widget to fit content."""
-    num_lines = int(result_text_widget.index("end-1c").split(".")[0])  # Get the number of lines
+    num_lines = len(result_text_widget.toPlainText().split("\n"))
     new_height = min(max(num_lines, 5), 20)  # Set a range between 5 and 20 lines
-    result_text_widget.config(height=new_height)  # Adjust height dynamically
+    result_text_widget.setFixedHeight(new_height * 30)  # Adjust height dynamically
 
 # Function to handle button click
 def on_submit():
-    ingredients = entry.get().strip()  # Get input from text field
+    ingredients = entry.text().strip()  # Get input from text field
     if not ingredients:
-        result_text_widget.delete("1.0", tk.END)  # Clear previous text
-        result_text_widget.insert("1.0", "Please enter some ingredients.")  # Show error message
+        result_text_widget.clear()  # Clear previous text
+        result_text_widget.setPlainText("Please enter some ingredients.")  # Show error message
         adjust_text_widget_size()  # Adjust box size
         return
 
-    result_text_widget.delete("1.0", tk.END)  # Clear previous results
-    result_text_widget.insert("1.0", "AI Suggestions loading...\n")  # Show loading text
-    root.update()  # Refresh UI
+    result_text_widget.clear()  # Clear previous results
+    result_text_widget.setPlainText("AI Suggestions loading...\n")  # Show loading text
+    app.processEvents()  # Refresh UI
 
     ingredients_list = ingredients.split(", ")  # Convert input to a list
 
-    suggestions = get_ai_suggestions(ingredients_list)  # Get AI response
+    # Fetch AI suggestions using the imported method
+    suggestions = get_ai_suggestions(ingredients_list)
 
     if suggestions:
         result = (f"Dish Name:\n  {suggestions['dish_name']}\n\n"
@@ -32,60 +33,74 @@ def on_submit():
                   f"➖ Remove for Calories:\n  {', '.join(suggestions['remove_calories'])}\n\n"
                   f"💪 Add for Health:\n  {', '.join(suggestions['add_health'])}\n\n"
                   f"🚫 Remove for Health:\n  {', '.join(suggestions['remove_health'])}")
-        result_text_widget.delete("1.0", tk.END)  # Clear previous results
-        result_text_widget.insert("1.0", result)  # Display new results
+        result_text_widget.clear()
+        result_text_widget.setPlainText(result)
     else:
-        result_text_widget.delete("1.0", tk.END)
-        result_text_widget.insert("1.0", "Error: AI response could not be generated.")
+        result_text_widget.clear()
+        result_text_widget.setPlainText("Error: AI response could not be generated.")
 
     adjust_text_widget_size()  # Adjust text box size dynamically
 
-# Create the main window
-root = tk.Tk()
-root.title("AI Recipe Helper")
-root.geometry("700x600")
-root.configure(bg="#f4f4f4")  # Light gray background
+# PyQt5 Application Setup
+app = QtWidgets.QApplication(sys.argv)
+window = QtWidgets.QWidget()
+window.setWindowTitle("AI Recipe Helper")
+window.resize(700, 600)
+window.setStyleSheet("""
+    QWidget {
+        background-color: #2C2F36;
+        color: white;
+        font-family: Arial;
+    }
+    QPushButton {
+        background-color: #4CAF50;
+        border-radius: 15px;
+        padding: 10px 20px;
+        font-weight: bold;
+        color: white;
+    }
+    QLineEdit {
+        background-color: #444c56;
+        border-radius: 15px;
+        padding: 10px;
+        font-size: 14px;
+    }
+    QTextEdit {
+        background-color: #444c56;
+        color: white;
+        border-radius: 15px;
+        padding: 10px;
+    }
+    QLabel {
+        font-size: 14px;
+        color: white;
+    }
+""")
+
+# Layout setup
+layout = QtWidgets.QVBoxLayout(window)
 
 # Input field label
-label = tk.Label(root, text="Enter ingredients (comma-separated):", font=("Arial", 12), bg="#f4f4f4")
-label.pack(pady=5)
+label = QtWidgets.QLabel("Enter ingredients (comma-separated):")
+layout.addWidget(label)
 
-# Bigger, styled text entry field
-entry = tk.Entry(root, width=50, font=("Arial", 14), bg="white", fg="black", bd=3, relief="sunken")
-entry.pack(pady=10, ipadx=10, ipady=5)
+# Input field with rounded corners
+entry = QtWidgets.QLineEdit()
+layout.addWidget(entry)
 
-# Styled submit button
-submit_button = tk.Button(
-    root, 
-    text="Get AI Suggestions", 
-    command=on_submit,
-    font=("Arial", 12, "bold"),  
-    bg="#4CAF50",  # Green background
-    fg="white",  
-    padx=20,  
-    pady=5,  
-    borderwidth=3,  
-    relief="raised"  
-)
-submit_button.pack(pady=10)
+# Submit button with rounded corners
+submit_button = QtWidgets.QPushButton("Get AI Suggestions")
+submit_button.clicked.connect(on_submit)
+layout.addWidget(submit_button)
 
-# Result display using Text widget (instead of Label)
-result_text_widget = tk.Text(
-    root, 
-    font=("Arial", 14),  # Bigger text
-    fg="#333",  
-    bg="#f4f4f4",
-    wrap="word",  # Wrap text properly
-    padx=10,  
-    pady=10,  
-    bd=2,  
-    relief="groove",
-    height=5,  # Initial height
-)
-result_text_widget.pack(pady=20, fill="both", padx=20)
+# Result display using QTextEdit (for multiline text with dynamic height)
+result_text_widget = QtWidgets.QTextEdit()
+result_text_widget.setPlainText("Your AI-generated recipe suggestions will appear here.")
+result_text_widget.setReadOnly(True)
+layout.addWidget(result_text_widget)
 
-# Default message inside Text widget
-result_text_widget.insert("1.0", "Your AI-generated recipe suggestions will appear here.")  
+window.setLayout(layout)
 
 # Run the application
-root.mainloop()
+window.show()
+sys.exit(app.exec_())
